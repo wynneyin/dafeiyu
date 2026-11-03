@@ -23,6 +23,7 @@ PROVIDERS = {
     "custom_llm": ("utils.gpt_model.custom_llm", "Custom_LLM"),
     "dify": ("utils.gpt_model.dify", "Dify"),
     "volcengine": ("utils.gpt_model.volcengine", "VolcEngine"),
+    "claude": ("utils.gpt_model.claude", "Claude"),
 }
 
 

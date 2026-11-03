@@ -282,6 +282,24 @@ def start_server():
                     logger.error(f"callback处理失败！{e}")
                     return CommonResult(code=-1, message=f"callback处理失败！{e}")
 
+            # 管理页改完配置后调用：热重载 config.json，不重启进程
+            @app.post("/admin/reload")
+            async def admin_reload(request: Request):
+                global my_handle
+
+                client = request.client.host if request.client else ""
+                if client not in ("127.0.0.1", "::1"):
+                    return CommonResult(code=-1, message="仅允许本机调用")
+
+                try:
+                    logger.info("管理页请求热重载配置")
+                    my_handle.reload_config(config_path)
+                    logger.info("配置热重载完成")
+                    return CommonResult(code=200, message="配置已热重载")
+                except Exception as e:
+                    logger.error(traceback.format_exc())
+                    return CommonResult(code=-1, message=f"热重载失败：{e}")
+
             # 获取系统信息接口
             @app.get("/get_sys_info")
             async def get_sys_info():

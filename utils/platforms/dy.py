@@ -1,5 +1,6 @@
 import websocket
 import json
+import time
 import traceback
 
 from utils.my_log import logger
@@ -191,32 +192,38 @@ def start_listen(new_config, common, my_handle, platform: str, schedule_thread):
     def on_open(ws):
         logger.debug("WebSocket connection established")
 
-    try:
-        # WebSocket连接URL
-        ws_url = "ws://127.0.0.1:8888"
+    # WebSocket连接URL
+    ws_url = "ws://127.0.0.1:8888"
 
-        logger.info(f"监听地址：{ws_url}")
+    # 不设置日志等级
+    websocket.enableTrace(False)
 
-        # 不设置日志等级
-        websocket.enableTrace(False)
-        # 创建WebSocket连接
-        ws = websocket.WebSocketApp(
-            ws_url,
-            on_message=on_message,
-            on_error=on_error,
-            on_close=on_close,
-            on_open=on_open,
-        )
+    # 弹幕监听程序可能比主程序晚启动，或中途重启，这里断线后自动重连
+    while True:
+        try:
+            logger.info(f"监听地址：{ws_url}")
 
-        # 运行WebSocket连接
-        ws.run_forever()
-    except KeyboardInterrupt:
-        logger.warning("程序被强行退出")
-    finally:
+            # 创建WebSocket连接
+            ws = websocket.WebSocketApp(
+                ws_url,
+                on_message=on_message,
+                on_error=on_error,
+                on_close=on_close,
+                on_open=on_open,
+            )
+
+            # 运行WebSocket连接（阻塞，断线后返回）
+            ws.run_forever()
+        except KeyboardInterrupt:
+            logger.warning("程序被强行退出")
+            break
+        except Exception:
+            logger.error(traceback.format_exc())
+
         logger.warning(
-            "关闭ws连接...请确认您是否启动了抖音弹幕监听程序，ws服务正常运行！\n监听程序启动成功后，请重新运行程序进行对接使用！"
+            "弹幕ws连接已断开，5秒后自动重连...请确认抖音弹幕监听程序已启动，ws服务正常运行！"
         )
-        # os._exit(0)
+        time.sleep(5)
 
     # 等待子线程结束
     schedule_thread.join()

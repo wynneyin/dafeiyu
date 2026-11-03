@@ -12,6 +12,7 @@ CHAT_TYPE_OPTIONS = {
     'anythingllm': 'AnythingLLM',
     'dify': 'Dify',
     'volcengine': '火山引擎',
+    'claude': 'Claude',
     'custom_llm': '自定义LLM',
 }
 

@@ -144,12 +144,13 @@ class My_handle(metaclass=SingletonMeta):
             self.custom_llm = None
             self.dify = None
             self.volcengine = None
+            self.claude = None
 
             self.image_recognition_model = None
 
             self.chat_type_list = ["chatgpt",  "langchain_chatchat", "zhipu", \
                     "tongyi", "my_wenxinworkshop", "gemini", "anythingllm", \
-                    "custom_llm",  "dify", "volcengine"]
+                    "custom_llm",  "dify", "volcengine", "claude"]
 
             # 配置加载
             self.config_load()
@@ -1485,6 +1486,7 @@ class My_handle(metaclass=SingletonMeta):
                     "custom_llm": lambda: self.custom_llm.get_resp({"prompt": data["content"]}),
                     "dify": lambda: self.dify.get_resp({"prompt": data["content"]}),
                     "volcengine": lambda: self.volcengine.get_resp({"prompt": data["content"]}),
+                    "claude": lambda: self.claude.get_resp(data["content"]),
                     "reread": lambda: data["content"]
                 }
             elif type == "vision":

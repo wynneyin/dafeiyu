@@ -24,6 +24,7 @@ SUPPORTED_PROVIDERS = {
     "custom_llm",
     "dify",
     "volcengine",
+    "claude",
 }
 
 RETIRED_PROVIDERS = {

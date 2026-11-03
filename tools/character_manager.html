@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>大肥鱼 · 角色管理</title>
+<style>
+:root{
+  --bg:#071a30;--panel:#0d2743;--panel2:#123253;--line:#1e4b76;
+  --text:#e8f4ff;--muted:#8fb3d1;--cyan:#5fd7ff;--pink:#ff9ecb;--ok:#5ee0a0;--warn:#ffcf6b;--err:#ff7b7b;
+}
+*{box-sizing:border-box}
+body{margin:0;padding:22px 22px 120px;background:radial-gradient(1200px 600px at 50% -10%,#124a78 0%,#071a30 55%,#04101f 100%);
+  color:var(--text);font:15px/1.6 "Microsoft YaHei","PingFang SC",system-ui,sans-serif;min-height:100vh}
+h1{font-size:22px;margin:0 0 4px;letter-spacing:1px}
+.sub{color:var(--muted);font-size:13px;margin-bottom:18px}
+.status{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 18px}
+.chip{display:inline-flex;align-items:center;gap:7px;padding:5px 12px;border-radius:999px;background:#0b2138;border:1px solid var(--line);font-size:13px;color:var(--muted)}
+.dot{width:9px;height:9px;border-radius:50%;background:#456;box-shadow:0 0 0 3px #0006}
+.dot.on{background:var(--ok);box-shadow:0 0 10px var(--ok)}
+.card{background:linear-gradient(180deg,rgba(18,50,83,.72),rgba(9,30,52,.82));border:1px solid var(--line);border-radius:18px;padding:18px 20px;margin-bottom:18px;box-shadow:0 10px 30px #0004}
+.card h2{font-size:16px;margin:0 0 12px;display:flex;align-items:center;gap:9px}
+.card h2 small{font-weight:400;color:var(--muted);font-size:12px}
+.models{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.model{position:relative;border:2px solid transparent;border-radius:14px;background:#0a2038;overflow:hidden;cursor:pointer;transition:.15s;user-select:none}
+.model:hover{transform:translateY(-2px);border-color:#2c6f9f}
+.model.sel{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(95,215,255,.18),0 8px 22px #5fd7ff22}
+.model .thumb{height:130px;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 35%,#16456f,#081a2e);overflow:hidden}
+.model .thumb img{width:100%;height:100%;object-fit:contain;object-position:center top}
+.model .thumb .ph{color:#4f7fa5;font-size:12px}
+.model .name{padding:8px 10px;font-size:13px;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.model .name b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.model .badge{font-size:11px;color:#062033;background:var(--cyan);border-radius:999px;padding:1px 7px;display:none}
+.model.sel .badge{display:inline-block}
+.row{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+label{color:var(--muted);font-size:13px}
+select,input[type=text],input[type=number],textarea{
+  background:#081d33;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:9px 11px;font-size:14px;font-family:inherit;outline:none}
+select:focus,input:focus,textarea:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(95,215,255,.12)}
+select{min-width:260px}
+textarea{width:100%;min-height:150px;resize:vertical;line-height:1.65}
+.slider{display:flex;align-items:center;gap:10px}
+.slider input[type=range]{width:150px;accent-color:var(--cyan)}
+.slider output{min-width:52px;text-align:right;color:var(--cyan);font-variant-numeric:tabular-nums}
+button{font-family:inherit;font-size:14px;border-radius:10px;border:1px solid var(--line);background:#12395c;color:var(--text);padding:9px 16px;cursor:pointer;transition:.15s}
+button:hover{background:#175182;border-color:#2f7fb8}
+button.primary{background:linear-gradient(180deg,#39b8e8,#1d7fb8);border-color:#7fe6ff;color:#03192b;font-weight:700}
+button.primary:hover{filter:brightness(1.08)}
+button.ghost{background:transparent}
+button.danger{background:transparent;color:#ff9b9b;border-color:#5b2e3a}
+button.danger:hover{background:#3a1d26}
+button:disabled{opacity:.45;cursor:not-allowed}
+.bar{position:fixed;left:0;right:0;bottom:0;padding:12px 22px;background:rgba(4,16,31,.92);backdrop-filter:blur(8px);border-top:1px solid var(--line);display:flex;gap:14px;align-items:center;flex-wrap:wrap;z-index:20}
+.bar .spacer{flex:1}
+#msgs{font-size:13px;color:var(--muted);max-width:60ch}
+#msgs .ok{color:var(--ok)}#msgs .warn{color:var(--warn)}#msgs .err{color:var(--err)}
+.profiles{display:flex;flex-direction:column;gap:8px}
+.profile{display:flex;align-items:center;gap:10px;padding:9px 12px;background:#0a2038;border:1px solid var(--line);border-radius:12px}
+.profile .meta{flex:1;font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.profile .meta b{color:var(--text)}
+.hint{color:var(--muted);font-size:12px;margin-top:8px}
+.adv summary{cursor:pointer;color:var(--muted);font-size:13px}
+.adv[open] summary{margin-bottom:10px}
+audio{height:34px}
+</style>
+</head>
+<body>
+<h1>大肥鱼 · 角色管理</h1>
+<div class="sub">切皮套、换音色、改人设，改完点“保存并应用”。舞台会自动刷新，OBS 不用手动点。</div>
+
+<div class="status">
+  <span class="chip"><i class="dot" id="dot-main"></i>主程序 <span id="main-text">检测中</span></span>
+  <span class="chip">LLM：<span id="llm-text">-</span></span>
+  <span class="chip">TTS：<span id="tts-text">-</span></span>
+</div>
+
+<div class="card">
+  <h2>皮套 <small>点一下选中，应用后舞台自动换模型</small></h2>
+  <div class="models" id="models"></div>
+</div>
+
+<div class="card">
+  <h2>音色 <small>Edge TTS，中文音色</small></h2>
+  <div class="row" style="margin-bottom:14px">
+    <label for="voice">音色</label>
+    <select id="voice"></select>
+    <button id="preview">试听</button>
+    <audio id="player" controls hidden></audio>
+  </div>
+  <div class="row">
+    <div class="slider"><label for="rate">语速</label><input type="range" id="rate" min="-30" max="50" step="5" value="0"><output id="rate-out">+0%</output></div>
+    <div class="slider"><label for="volume">音量</label><input type="range" id="volume" min="-50" max="50" step="5" value="0"><output id="volume-out">+0%</output></div>
+  </div>
+  <div class="hint">试听只用来挑音色，不会影响直播；保存应用后主程序热重载，下一条回复就是新声音。</div>
+</div>
+
+<div class="card">
+  <h2>人设提示词 <small>写进 config.json 的 claude.preset</small></h2>
+  <textarea id="preset" spellcheck="false"></textarea>
+  <div class="hint"><span id="preset-count">0</span> 字。角色档案会把它一起存下来，方便以后做别的角色。</div>
+</div>
+
+<div class="card adv-wrap">
+  <details class="adv">
+    <summary>高级：LLM 模型</summary>
+    <div class="row">
+      <label for="llm-model">模型 id</label>
+      <input type="text" id="llm-model" list="llm-list" style="min-width:320px" placeholder="opencode-go/deepseek-v4.1-flash">
+      <datalist id="llm-list"></datalist>
+    </div>
+    <div class="hint">列表来自本机 3425 中转；留空则不改。</div>
+  </details>
+</div>
+
+<div class="card">
+  <h2>角色档案 <small>皮套 + 音色 + 人设 + LLM 存成一套</small></h2>
+  <div class="row" style="margin-bottom:12px">
+    <input type="text" id="profile-name" placeholder="给这套配置起个名，比如：社畜鱼·晓伊" style="min-width:300px">
+    <button id="profile-save">保存当前配置为档案</button>
+  </div>
+  <div class="profiles" id="profiles"></div>
+  <div class="hint" id="profiles-empty">还没有档案。切换好皮套和音色后，存一套，以后一键切回来。</div>
+</div>
+
+<div class="bar">
+  <button class="primary" id="apply">保存并应用</button>
+  <div id="msgs">修改后点这里生效</div>
+  <div class="spacer"></div>
+  <span class="chip">管理页 http://127.0.0.1:8090</span>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let state = null;
+let selectedModel = '';
+
+function pct(n, sign = true) {
+  const v = Number(n) || 0;
+  return (sign && v > 0 ? '+' : '') + v + '%';
+}
+function parsePct(text) {
+  const v = parseInt(String(text || '0').replace('%', ''), 10);
+  return Number.isFinite(v) ? v : 0;
+}
+
+async function api(path, payload) {
+  const opt = payload === undefined ? {} : {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload),
+  };
+  const res = await fetch(path, opt);
+  const type = res.headers.get('Content-Type') || '';
+  if (type.includes('application/json')) {
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || '请求失败');
+    return data;
+  }
+  if (!res.ok) throw new Error('请求失败 ' + res.status);
+  return res;
+}
+
+function showMessages(list, kinds = []) {
+  const box = $('msgs');
+  box.innerHTML = '';
+  list.forEach((text, i) => {
+    const span = document.createElement('div');
+    span.className = kinds[i] || '';
+    span.textContent = text;
+    box.appendChild(span);
+  });
+}
+
+function renderModels() {
+  const box = $('models');
+  box.innerHTML = '';
+  state.models.forEach((m) => {
+    const el = document.createElement('div');
+    el.className = 'model' + (m.name === selectedModel ? ' sel' : '');
+    const thumb = m.thumb
+      ? `<img src="${m.thumb}" alt="${m.name}" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'ph',textContent:'无预览图'}))">`
+      : '<div class="ph">无预览图</div>';
+    el.innerHTML = `<div class="thumb">${thumb}</div>
+      <div class="name"><b title="${m.name}">${m.name}</b><span class="badge">使用中</span></div>`;
+    el.onclick = () => { selectedModel = m.name; renderModels(); };
+    box.appendChild(el);
+  });
+}
+
+function renderVoices() {
+  const sel = $('voice');
+  sel.innerHTML = '';
+  const seen = new Set();
+  state.voices.forEach((v) => {
+    seen.add(v.id);
+    const o = document.createElement('option');
+    o.value = v.id; o.textContent = v.label + '（' + v.id + '）';
+    sel.appendChild(o);
+  });
+  if (!seen.has(state.voice)) {
+    const o = document.createElement('option');
+    o.value = state.voice; o.textContent = state.voice + '（自定义/当前）';
+    sel.appendChild(o);
+  }
+  sel.value = state.voice;
+}
+
+function renderProfiles() {
+  const box = $('profiles');
+  box.innerHTML = '';
+  $('profiles-empty').style.display = state.profiles.length ? 'none' : 'block';
+  state.profiles.forEach((p) => {
+    const row = document.createElement('div');
+    row.className = 'profile';
+    row.innerHTML = `<div class="meta"><b>${p.name}</b> · 皮套 ${p.model || '-'} · 音色 ${p.voice || '-'} · ${p.created_at || ''}</div>`;
+    const use = document.createElement('button');
+    use.textContent = '应用';
+    use.onclick = async () => {
+      try {
+        const data = await api('/api/profile/apply', {id: p.id});
+        showMessages(data.messages, ['ok', 'ok']);
+        await load();
+      } catch (e) { showMessages([e.message], ['err']); }
+    };
+    const del = document.createElement('button');
+    del.className = 'danger'; del.textContent = '删除';
+    del.onclick = async () => {
+      try {
+        const data = await api('/api/profile/delete', {id: p.id});
+        state.profiles = data.profiles; renderProfiles();
+      } catch (e) { showMessages([e.message], ['err']); }
+    };
+    row.appendChild(use); row.appendChild(del);
+    box.appendChild(row);
+  });
+}
+
+async function load() {
+  try {
+    const data = await api('/api/state');
+    state = data.state;
+    selectedModel = state.model || (state.models[0] && state.models[0].name) || '';
+    $('dot-main').className = 'dot' + (state.main_online ? ' on' : '');
+    $('main-text').textContent = state.main_online ? '在线' : '离线（配置仍可保存）';
+    $('llm-text').textContent = state.chat_type + ' / ' + (state.llm_model || '-');
+    $('tts-text').textContent = state.tts_type || '-';
+    $('llm-model').value = state.llm_model || '';
+    const list = $('llm-list');
+    list.innerHTML = '';
+    state.llm_models.forEach((id) => {
+      const o = document.createElement('option'); o.value = id; list.appendChild(o);
+    });
+    renderModels();
+    renderVoices();
+    $('rate').value = parsePct(state.rate);
+    $('volume').value = parsePct(state.volume);
+    $('rate-out').textContent = pct(state.rate);
+    $('volume-out').textContent = pct(state.volume);
+    $('preset').value = state.preset || '';
+    $('preset-count').textContent = ($('preset').value || '').length;
+    renderProfiles();
+  } catch (e) {
+    showMessages(['读取配置失败：' + e.message], ['err']);
+  }
+}
+
+function formValues() {
+  return {
+    model: selectedModel,
+    voice: $('voice').value,
+    rate: $('rate').value,
+    volume: $('volume').value,
+    preset: $('preset').value,
+    llm_model: $('llm-model').value.trim(),
+  };
+}
+
+$('rate').oninput = () => { $('rate-out').textContent = pct($('rate').value); };
+$('volume').oninput = () => { $('volume-out').textContent = pct($('volume').value); };
+$('preset').oninput = () => { $('preset-count').textContent = $('preset').value.length; };
+
+$('apply').onclick = async () => {
+  const btn = $('apply');
+  btn.disabled = true;
+  showMessages(['正在保存…']);
+  try {
+    const values = formValues();
+    const data = await api('/api/apply', values);
+    showMessages(data.messages, data.messages.map((m) => (m.includes('未重载') ? 'warn' : 'ok')));
+    await load();
+  } catch (e) {
+    showMessages(['应用失败：' + e.message], ['err']);
+  } finally {
+    btn.disabled = false;
+  }
+};
+
+$('preview').onclick = async () => {
+  const btn = $('preview');
+  btn.disabled = true;
+  showMessages(['正在合成试听…']);
+  try {
+    const res = await api('/api/preview', formValues());
+    const blob = await res.blob();
+    const player = $('player');
+    player.src = URL.createObjectURL(blob);
+    player.hidden = false;
+    player.play();
+    showMessages(['试听已生成，点播放器上的按钮可以重听'], ['ok']);
+  } catch (e) {
+    showMessages(['试听失败：' + e.message + '（检查网络/edge-tts 是否可用）'], ['err']);
+  } finally {
+    btn.disabled = false;
+  }
+};
+
+$('profile-save').onclick = async () => {
+  const name = $('profile-name').value.trim();
+  if (!name) { showMessages(['先给档案起个名字'], ['warn']); return; }
+  try {
+    const data = await api('/api/profile/save', {name, ...formValues()});
+    state.profiles = data.profiles;
+    $('profile-name').value = '';
+    renderProfiles();
+    showMessages(['档案「' + name + '」已保存'], ['ok']);
+  } catch (e) { showMessages(['保存失败：' + e.message], ['err']); }
+};
+
+load();
+</script>
+</body>
+</html>

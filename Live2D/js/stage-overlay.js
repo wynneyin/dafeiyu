@@ -134,6 +134,7 @@
   function setThinking(on) {
     bubble.classList.toggle('on', !!on);
     thinking = !!on;
+    window.__songroomThinking = !!on;   // 舞台键盘层用它加快敲击频率
     if (on) {
       bubbleText.textContent = THINK_TEXTS[Math.floor(Math.random() * THINK_TEXTS.length)];
       place();

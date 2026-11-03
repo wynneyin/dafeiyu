@@ -1,4 +1,5 @@
 # 云端/本地大模型 provider，按 config 里实际选用的模型安装
+anthropic==2.4.0
 dashscope==1.14.1
 google-generativeai==0.7.2
 PyJWT==2.8.0
