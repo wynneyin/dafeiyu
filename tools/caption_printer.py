@@ -23,7 +23,10 @@ THINKING_TTL = 25.0
 THINKING = {'on': False, 'at': 0.0}
 
 # 特效：每次触发 seq+1，前端记住上次看过的 seq
-EFFECT = {'name': '', 'seq': 0, 'at': 0.0}
+# gesture/expression/face 由主程序按配置下发，舞台页照做，页面不用内置规则
+# face 是 Live2D/faces/<名字>.png 贴脸图，face_duration 是停留秒数
+EFFECT = {'name': '', 'gesture': '', 'expression': '', 'duration': 0.0,
+          'face': '', 'face_duration': 0.0, 'seq': 0, 'at': 0.0}
 
 
 def emit(event):
@@ -68,8 +71,31 @@ class Handler(BaseHTTPRequestHandler):
 
         elif parsed.path == '/effect':
             name = query.get('name', ['clap'])[0][:32] or 'clap'
+            gesture = query.get('gesture', [''])[0][:32]
+            expression = query.get('expression', [''])[0][:64]
+            face = query.get('face', [''])[0][:64]
+            raw_duration = query.get('duration', [''])[0]
+            try:
+                duration = max(0.5, min(15.0, float(raw_duration or 0)))
+            except ValueError:
+                duration = 0.0
+            raw_face_duration = query.get('face_duration', [''])[0]
+            try:
+                face_duration = float(raw_face_duration or 0)
+            except ValueError:
+                face_duration = 0.0
+            if face:
+                if face_duration:
+                    face_duration = max(0.5, min(60.0, face_duration))
+                else:
+                    # 只配了 face、没写时间时给 5 秒，而不是 duration 的 0.5 秒兜底
+                    face_duration = duration if raw_duration else 5.0
+            else:
+                face_duration = 0.0
             with LOCK:
-                EFFECT.update(name=name, seq=EFFECT['seq'] + 1, at=now)
+                EFFECT.update(name=name, gesture=gesture, expression=expression,
+                              duration=duration, face=face, face_duration=face_duration,
+                              seq=EFFECT['seq'] + 1, at=now)
                 value = dict(EFFECT)
             data = {'code': 200, **value}
             emit({'event': 'EFFECT', **value})
@@ -80,7 +106,10 @@ class Handler(BaseHTTPRequestHandler):
                 thinking_on = THINKING['on'] and (now - THINKING['at'] < THINKING_TTL)
                 data['thinking'] = thinking_on
                 data['thinking_age'] = round(now - THINKING['at'], 2) if THINKING['at'] else None
-                data.update(effect=EFFECT['name'], effect_seq=EFFECT['seq'], effect_at=EFFECT['at'])
+                data.update(effect=EFFECT['name'], effect_seq=EFFECT['seq'], effect_at=EFFECT['at'],
+                            effect_gesture=EFFECT['gesture'], effect_expression=EFFECT['expression'],
+                            effect_duration=EFFECT['duration'], effect_face=EFFECT['face'],
+                            effect_face_duration=EFFECT['face_duration'])
 
         elif parsed.path == '/health':
             data = {'code': 200, 'service': 'local-caption-printer'}

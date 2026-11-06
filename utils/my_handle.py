@@ -2775,10 +2775,12 @@ class My_handle(metaclass=SingletonMeta):
             logger.debug(traceback.format_exc())
 
     def stage_effect_handle(self, content: str):
-        """弹幕命中特效关键词时让画面放一次特效。
+        """弹幕命中特效关键词时让画面放一次特效/动作/表情。
 
         配置：effects.<名字>.enable / effects.<名字>.keywords
-        现阶段只有 clap（鼓掌）。不模拟按键，所以不会打到其他窗口。
+              可选 gesture（nod/shake/tilt/look/bounce/recoil）、
+              expression（模型 EXP 里的名字，如「04 脸红」）、duration（秒）、
+              face（Live2D/faces/<名字>.png 的贴脸图）、face_duration（贴脸停留秒数）
         """
         try:
             effects = My_handle.config.get("effects")
@@ -2791,10 +2793,70 @@ class My_handle(metaclass=SingletonMeta):
                 if not isinstance(item, dict) or not item.get("enable"):
                     continue
                 if any(word and word in content for word in item.get("keywords", [])):
-                    My_handle.common.notify_stage(url, "/effect", {"name": name})
+                    params = {"name": name}
+                    for key in ("gesture", "expression", "duration", "face", "face_duration"):
+                        if item.get(key):
+                            params[key] = item[key]
+                    My_handle.common.notify_stage(url, "/effect", params)
                     logger.info(f"[舞台特效] {name} 已触发：{content}")
                     return True
             return False
+        except Exception:
+            logger.debug(traceback.format_exc())
+            return False
+
+    def stage_gift_action(self, data):
+        """礼物触发角色动作/表情，不受答谢语音开关影响。
+
+        配置：stage_actions.gifts.<礼物名> = {gesture, expression, duration, face, face_duration}
+              stage_actions.gift_fallback = {min_price, gesture, expression, duration, face}
+              stage_actions.cooldown_seconds 同一礼物名的冷却时间，默认 2 秒
+        """
+        try:
+            cfg = My_handle.config.get("stage_actions")
+            if not isinstance(cfg, dict) or not cfg.get("enable", False):
+                return False
+            url = My_handle.config.get("web_captions_printer", "api_ip_port")
+            if not url:
+                return False
+
+            gift_name = re.sub(r"\s*[xX×]\s*\d+\s*$", "", str(data.get("gift_name", ""))).strip()
+            rules = cfg.get("gifts") if isinstance(cfg.get("gifts"), dict) else {}
+            rule = rules.get(gift_name)
+            if not isinstance(rule, dict):
+                fallback = cfg.get("gift_fallback")
+                try:
+                    price = float(data.get("total_price") or 0)
+                except (TypeError, ValueError):
+                    price = 0.0
+                if isinstance(fallback, dict):
+                    try:
+                        min_price = float(fallback.get("min_price", 0) or 0)
+                    except (TypeError, ValueError):
+                        min_price = 0.0
+                    if price >= min_price:
+                        rule = fallback
+            if not isinstance(rule, dict) or rule.get("enable", True) is False:
+                return False
+
+            now = time.monotonic()
+            try:
+                cooldown = max(0.0, min(60.0, float(cfg.get("cooldown_seconds", 2))))
+            except (TypeError, ValueError):
+                cooldown = 2.0
+            if not hasattr(self, "_stage_gift_at"):
+                self._stage_gift_at = {}
+            if now - self._stage_gift_at.get(gift_name, 0.0) < cooldown:
+                return False
+            self._stage_gift_at[gift_name] = now
+
+            params = {"name": f"gift:{gift_name}"[:32]}
+            for key in ("gesture", "expression", "duration", "face", "face_duration"):
+                if rule.get(key):
+                    params[key] = rule[key]
+            My_handle.common.notify_stage(url, "/effect", params)
+            logger.info(f"[舞台动作] 礼物 {gift_name} -> {params}")
+            return True
         except Exception:
             logger.debug(traceback.format_exc())
             return False
@@ -3191,6 +3253,10 @@ class My_handle(metaclass=SingletonMeta):
                     data['total_price'],
                     datetime.now())
                 )
+
+            # 舞台动作：礼物触发角色动作/表情。
+            # 放在答谢流程之前，即使答谢语音关闭、积分拦截或价格不足也照常播。
+            self.stage_gift_action(data)
 
             # 按键映射 触发后仍然执行后面的其他功能
             self.key_mapping_handle("弹幕", data)

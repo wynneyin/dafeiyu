@@ -186,6 +186,7 @@ Write-Host ''
 Write-Host '启动完成。' -ForegroundColor Cyan
 Write-Host '  角色管理：http://127.0.0.1:8090 （切皮套 / 换音色 / 改人设）' -ForegroundColor Cyan
 Write-Host '  OBS 浏览器源：http://127.0.0.1:12345/Live2D/stage-portrait.html （竖屏用这个，横屏用 stage-landscape.html）' -ForegroundColor Cyan
+Write-Host '  打工舞台：http://127.0.0.1:12345/Live2D/stage-work.html （工位 HUD + 持续打字，可加 ?hud=0 只看角色）' -ForegroundColor Cyan
 Write-Host '  字幕/口型服务会自己发布状态，OBS 里加好浏览器源和虚拟摄像头即可开播。' -ForegroundColor Cyan
 Write-Host ''
 Read-Host '按回车关闭本窗口（各服务在各自的窗口里继续运行）'

@@ -1605,7 +1605,76 @@
         "掌声",
         "拍拍手",
         "给你鼓掌"
-      ]
+      ],
+      "gesture": "bounce",
+      "duration": 3.2
+    },
+    "shy": {
+      "enable": true,
+      "keywords": [
+        "脸红",
+        "害羞",
+        "可爱"
+      ],
+      "gesture": "tilt",
+      "expression": "04 脸红",
+      "duration": 4.0
+    },
+    "surprise": {
+      "enable": true,
+      "keywords": [
+        "震惊",
+        "不会吧",
+        "真的假的"
+      ],
+      "gesture": "recoil",
+      "expression": "05 O O",
+      "duration": 3.5
+    },
+    "angry": {
+      "enable": true,
+      "keywords": [
+        "生气",
+        "气死",
+        "黑脸"
+      ],
+      "gesture": "shake",
+      "expression": "03 脸黑",
+      "duration": 3.5
+    },
+    "heart": {
+      "enable": true,
+      "keywords": [
+        "比心",
+        "爱你",
+        "喜欢你"
+      ],
+      "gesture": "bounce",
+      "expression": "05 》《",
+      "duration": 3.5
+    },
+    "dizzy": {
+      "enable": true,
+      "keywords": [
+        "晕了",
+        "好晕",
+        "转圈"
+      ],
+      "gesture": "look",
+      "expression": "06 X X",
+      "duration": 3.5
+    },
+    "laoda": {
+      "enable": true,
+      "keywords": [
+        "牢大",
+        "科比",
+        "kobe",
+        "曼巴"
+      ],
+      "face": "牢大",
+      "face_duration": 6.0,
+      "duration": 6.0
     }
   },
   "abnormal_alarm": {
@@ -1878,6 +1947,38 @@
     "small_heart_blessing": {
       "enable": true,
       "cooldown_seconds": 30
+    }
+  },
+  "stage_actions": {
+    "enable": true,
+    "cooldown_seconds": 2,
+    "gifts": {
+      "小心心": {
+        "gesture": "bounce",
+        "expression": "04 脸红",
+        "duration": 3.5
+      },
+      "玫瑰": {
+        "gesture": "tilt",
+        "expression": "05 》《",
+        "duration": 4.0
+      },
+      "抖音1号": {
+        "gesture": "bounce",
+        "expression": "05 O O",
+        "duration": 5.0
+      },
+      "嘉年华": {
+        "gesture": "bounce",
+        "expression": "06 X X",
+        "duration": 5.0
+      }
+    },
+    "gift_fallback": {
+      "min_price": 1,
+      "gesture": "nod",
+      "expression": "",
+      "duration": 2.5
     }
   }
 }

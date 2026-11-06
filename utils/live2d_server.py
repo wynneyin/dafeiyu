@@ -22,7 +22,9 @@ class StaticHandler(http.server.SimpleHTTPRequestHandler):
 
     def end_headers(self):
         path = self.path.split("?", 1)[0].lower()
-        if path.endswith((".html", "model_name.js", "avatar.json")):
+        # 表情文件会被舞台叠加层/模型在启动时读取，改完表情（比如补水印参数）要能立即生效
+        # 贴脸图可能被随时替换，也禁用缓存
+        if path.endswith((".html", "model_name.js", "avatar.json", ".exp3.json")) or "/faces/" in path:
             self.send_header("Cache-Control", "no-store, max-age=0")
         super().end_headers()
 

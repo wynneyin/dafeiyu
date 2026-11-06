@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>大肥鱼 · 打工舞台</title>
+<link rel="stylesheet" href="./css/live2d.css">
+<script src="./js/model_name.js?v=20261027-mao"></script>
+<script>
+// 打工舞台固定用大肥鱼；想换皮套调试可以加 ?model=Hiyori
+try {
+  const m = new URLSearchParams(location.search).get('model');
+  window.model_name = m || '大肥鱼';
+} catch (e) { window.model_name = '大肥鱼'; }
+</script>
+<script src="./js/live2dcubismcore.js?v=5.1.0"></script>
+<script src="./js/bundle.songroom-lipsync.js?v=20261103-expr4"></script>
+<style>
+*{box-sizing:border-box}
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#0d2b33}
+body{display:grid;place-items:center;font-family:"Microsoft YaHei","PingFang SC","Noto Sans SC",sans-serif}
+#stage{position:absolute;width:1080px;height:1920px;overflow:hidden;isolation:isolate;
+  transform-origin:center center;background:#256f78;color:#fff}
+
+/* ---------- 背景 ---------- */
+#work-bg{position:absolute;inset:0;z-index:0;background:
+  radial-gradient(70% 42% at 72% 58%, rgba(150,240,235,.26) 0%, rgba(150,240,235,0) 62%),
+  radial-gradient(90% 40% at 18% 8%, rgba(80,190,200,.18) 0%, rgba(80,190,200,0) 60%),
+  linear-gradient(180deg,#123d4a 0%,#1a5762 26%,#237079 52%,#2d8289 74%,#389396 100%)}
+#work-bg::after{content:"";position:absolute;inset:0;
+  background:radial-gradient(120% 90% at 50% 45%, transparent 55%, rgba(4,24,30,.42) 100%)}
+#work-particles{position:absolute;inset:0;z-index:1;overflow:hidden;pointer-events:none}
+.wp{position:absolute;border-radius:50%;background:rgba(230,255,255,.5);
+  box-shadow:0 0 10px rgba(180,255,250,.5);animation:wp-drift linear infinite}
+@keyframes wp-drift{
+  0%{transform:translate3d(0,20px,0) scale(.7);opacity:0}
+  12%{opacity:.75}
+  70%{opacity:.55}
+  100%{transform:translate3d(var(--dx),var(--dy),0) scale(1.1);opacity:0}
+}
+
+/* ---------- 角色：放大裁到桌子后面 ---------- */
+#model-surface{position:absolute;width:900px;height:1040px;left:-420px;top:610px;
+  transform:scale(2.5);transform-origin:0 0;z-index:2}
+#landlord{width:900px!important;height:1040px!important;margin:0;background:transparent}
+#live2d{width:900px!important;height:1040px!important;display:block}
+.message,#controller{display:none!important}
+
+/* ---------- 场景物件 ---------- */
+.work-shadow{position:absolute;left:548px;top:1424px;width:440px;height:72px;z-index:3;
+  background:radial-gradient(closest-side,rgba(2,20,24,.5),rgba(2,20,24,0));pointer-events:none}
+.work-desk{position:absolute;left:-40px;top:1432px;width:1160px;height:500px;z-index:3;
+  background:linear-gradient(180deg,rgba(10,44,52,.10) 0%,rgba(10,40,48,.52) 9%,rgba(8,34,42,.92) 40%,#082830 100%);
+  border-top:2px solid rgba(176,238,235,.20);border-radius:46% 46% 0 0/52px 52px 0 0;
+  box-shadow:0 -16px 40px rgba(2,22,28,.25) inset;pointer-events:none}
+.work-desk::after{content:"";position:absolute;left:0;right:0;top:10px;height:2px;
+  background:linear-gradient(90deg,transparent,rgba(190,246,242,.35),transparent)}
+#stage.no-hud .work-desk{background:linear-gradient(180deg,rgba(10,44,52,.18) 0%,rgba(8,36,44,.78) 10%,#072730 42%,#061f26 100%)}
+
+.work-monitor{position:absolute;left:10px;top:1200px;width:470px;height:318px;z-index:4;
+  padding:14px 16px;border-radius:14px;border:12px solid #223137;background:#08161b;
+  box-shadow:0 22px 48px rgba(0,14,20,.55),0 0 0 2px rgba(170,240,236,.08),inset 0 0 0 2px #071217;
+  overflow:hidden;pointer-events:none}
+.work-monitor::after{content:"";position:absolute;left:50%;bottom:-30px;width:150px;height:30px;
+  transform:translateX(-50%);background:linear-gradient(180deg,#2a3a40,#162327);border-radius:0 0 12px 12px;
+  box-shadow:0 10px 18px rgba(0,12,16,.35)}
+#work-code{position:absolute;inset:14px 16px;margin:0;overflow:hidden;
+  font:14px/1.6 Consolas,"Cascadia Mono",monospace;color:#8fe3c3;
+  text-shadow:0 0 7px rgba(90,255,190,.35);white-space:pre-wrap}
+#work-code::after{content:"▌";color:#b8fff0;animation:caret 1s steps(1) infinite}
+@keyframes caret{0%,49%{opacity:1}50%,100%{opacity:0}}
+
+.work-timer{position:absolute;left:80px;top:1086px;width:186px;height:186px;z-index:5;
+  border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:conic-gradient(#79d6c6 var(--p,92%), rgba(70,120,130,.22) 0);
+  box-shadow:0 14px 30px rgba(0,18,24,.38);pointer-events:none}
+.work-timer::before{content:"";position:absolute;inset:12px;border-radius:50%;
+  background:radial-gradient(circle at 36% 28%,#fbffff 0%,#e2f0f2 55%,#c7dfe3 100%);
+  box-shadow:inset 0 2px 6px rgba(0,60,70,.18)}
+.work-timer::after{content:"";position:absolute;left:50%;top:-8px;width:54px;height:18px;
+  transform:translateX(-50%);border-radius:8px;background:#cfdee1;box-shadow:0 3px 6px rgba(0,20,24,.3)}
+.work-timer b{position:relative;z-index:1;font-size:62px;line-height:1;font-weight:800;color:#2b4a55;
+  font-variant-numeric:tabular-nums}
+.work-timer span{position:relative;z-index:1;font-size:19px;color:#5f7d86;margin-top:3px;font-weight:600}
+
+.work-mug{position:absolute;right:42px;top:1364px;width:88px;height:104px;z-index:5;
+  border-radius:10px 10px 22px 22px;
+  background:linear-gradient(160deg,#f8fdfd,#c6dde1);
+  box-shadow:0 12px 24px rgba(0,18,24,.32),inset 0 0 0 2px rgba(255,255,255,.6);pointer-events:none}
+.work-mug::after{content:"";position:absolute;right:-28px;top:18px;width:42px;height:48px;
+  border:11px solid #d9eaec;border-left:0;border-radius:0 50% 50% 0}
+.work-mug i{position:absolute;left:0;right:0;top:16px;text-align:center;font-style:normal;font-size:34px}
+
+.work-mood{position:absolute;left:800px;top:916px;z-index:6;display:flex;align-items:center;gap:11px;
+  padding:12px 22px;border-radius:999px;background:rgba(20,32,42,.72);
+  border:1px solid rgba(255,255,255,.12);box-shadow:0 10px 26px rgba(0,16,22,.32);
+  font-size:24px;font-weight:600;color:#eafaff;pointer-events:none;white-space:nowrap}
+.work-mood i{width:11px;height:11px;border-radius:50%;background:#ff9fb0;
+  box-shadow:0 0 12px #ff9fb0;animation:pulse 1.7s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.55;transform:scale(.85)}50%{opacity:1;transform:scale(1.15)}}
+
+/* ---------- 顶部 HUD ---------- */
+.work-hud{position:absolute;inset:0;z-index:7;pointer-events:none}
+.w-salary{position:absolute;left:34px;top:86px;width:1012px;padding:20px 30px 18px;border-radius:22px;
+  background:linear-gradient(135deg,rgba(62,50,92,.95),rgba(32,27,54,.95));
+  border:1px solid rgba(255,255,255,.09);box-shadow:0 16px 40px rgba(0,8,22,.35),inset 0 1px 0 rgba(255,255,255,.10)}
+.w-salary-top{display:flex;align-items:baseline;justify-content:space-between}
+.w-shift{font-size:26px;color:#b8a9d6;letter-spacing:.4px}
+.w-shift b{font-size:30px;color:#fff;font-weight:800}
+.w-pct{margin-left:8px;font-size:22px;color:#9b8cba}
+.w-money{font-size:24px;color:#b8a9d6;display:flex;align-items:baseline;gap:8px}
+.w-money b{font-size:56px;line-height:1;font-weight:800;color:#fff;letter-spacing:1px;font-variant-numeric:tabular-nums}
+.w-money .unit{font-size:19px;color:#b8a9d6;margin-left:4px}
+.w-bar{position:relative;margin-top:14px;height:18px;border-radius:999px;background:rgba(255,255,255,.12);overflow:hidden}
+.w-bar i{position:absolute;left:0;top:0;bottom:0;width:83%;border-radius:999px;
+  background:linear-gradient(90deg,#66b95d,#a5e48b);box-shadow:0 0 18px rgba(140,230,140,.45);
+  transition:width .8s ease}
+.w-bar i::after{content:"";position:absolute;inset:0;border-radius:999px;
+  background:linear-gradient(180deg,rgba(255,255,255,.35),transparent 60%)}
+
+.w-pills{position:absolute;left:34px;top:258px;width:1012px;display:flex;gap:22px}
+.w-pill{flex:1;height:64px;border-radius:14px;display:flex;align-items:center;justify-content:center;
+  gap:12px;font-size:28px;font-weight:700;border:1px solid rgba(255,255,255,.08)}
+.w-pill.green{background:rgba(26,52,54,.88);color:#a8e39e}
+.w-pill.purple{background:rgba(66,46,94,.88);color:#e5d6ff}
+.w-pill i{width:12px;height:12px;border-radius:50%;background:currentColor;
+  box-shadow:0 0 12px currentColor;animation:pulse 1.7s ease-in-out infinite}
+
+.w-mults{position:absolute;left:44px;top:340px;width:992px;display:flex;justify-content:space-between;
+  font-size:25px;color:#c6d9de;text-shadow:0 2px 6px rgba(0,20,30,.35)}
+
+.w-rules{position:absolute;left:34px;top:384px;width:1012px;padding:22px 28px 22px;border-radius:20px;
+  background:rgba(28,25,47,.74);border:1px solid rgba(255,255,255,.08);box-shadow:0 12px 30px rgba(0,8,20,.22)}
+.w-rule-line{display:flex;align-items:center;gap:12px;font-size:28px;color:#f1ecff;font-weight:600}
+.w-rule-line b{flex:none;padding:3px 14px;border-radius:8px;background:#4a3a72;color:#d8c8ff;
+  font-size:23px;font-weight:700}
+.w-star{color:#ffd66e;font-size:28px}
+.w-stats{display:flex;margin-top:16px}
+.w-stats>div{flex:1;text-align:center;border-right:1px solid rgba(255,255,255,.08)}
+.w-stats>div:last-child{border-right:0}
+.w-stats b{display:block;font-size:42px;line-height:1.05;font-weight:800;color:#fff;
+  font-variant-numeric:tabular-nums}
+.w-stats span{display:block;margin-top:5px;font-size:23px;color:#a99fc0;font-weight:500}
+
+.w-log-label{position:absolute;left:44px;top:584px;font-size:24px;color:#b7cdd2;font-weight:600}
+.w-log-label i{font-style:normal;opacity:.45;margin:0 8px}
+
+.w-log{position:absolute;left:34px;top:618px;width:1012px;min-height:76px;padding:16px 24px;
+  border-radius:14px;background:rgba(18,26,40,.72);border:1px solid rgba(255,255,255,.07);
+  font-size:30px;line-height:1.42;color:#f4fbff;font-weight:500}
+#stage-caption{left:34px!important;top:618px!important;bottom:auto!important;transform:none!important;
+  width:1012px!important;min-height:76px!important;padding:16px 24px!important;border-radius:14px!important;
+  background:rgba(18,26,40,.78)!important;border:1px solid rgba(255,255,255,.07)!important;
+  box-shadow:none!important;color:#f4fbff!important;text-shadow:none!important;
+  font:500 30px/1.42 "Microsoft YaHei","PingFang SC",sans-serif!important;letter-spacing:0!important;
+  text-align:left!important;white-space:pre-wrap!important}
+
+/* ---------- 底部快捷栏 ---------- */
+.work-actions{position:absolute;left:0;bottom:0;width:1080px;height:300px;z-index:10;
+  display:flex;align-items:flex-start;justify-content:space-around;padding:26px 24px 0;
+  background:linear-gradient(180deg,#dbc9b7 0%,#d3bca8 58%,#f4eee5 58%,#f7f1e9 100%);
+  border-top:2px solid rgba(255,255,255,.5);box-shadow:0 -12px 30px rgba(0,20,24,.18)}
+.w-act{width:168px;display:flex;flex-direction:column;align-items:center;gap:10px;
+  border:0;background:none;padding:0;font-family:inherit;color:#5d4b3f;cursor:pointer;
+  pointer-events:auto;-webkit-tap-highlight-color:transparent}
+.w-act .ico{width:96px;height:96px;border-radius:24px;display:flex;align-items:center;justify-content:center;
+  font-size:52px;line-height:1;background:linear-gradient(160deg,#fffaf2,#efe4d4);
+  box-shadow:0 8px 18px rgba(90,60,40,.20),inset 0 0 0 2px rgba(255,255,255,.65);
+  transition:transform .12s ease,box-shadow .12s ease}
+.w-act span{font-size:25px;font-weight:700;white-space:nowrap;letter-spacing:.3px}
+.w-act:active .ico,.w-act.pressed .ico{transform:translateY(5px) scale(.95);
+  box-shadow:0 3px 8px rgba(90,60,40,.18)}
+.w-foot{position:absolute;left:0;right:0;bottom:16px;text-align:center;font-size:19px;
+  color:#b5a596;letter-spacing:2px;pointer-events:none}
+
+/* ---------- 键盘层改成桌面上的奶白键盘 ---------- */
+#stage #kt-desk{left:65%;bottom:268px;transform:translateX(-50%) scale(.66);z-index:6}
+#stage #kt-board{background:linear-gradient(180deg,#f2eadf 0%,#ddd2c2 55%,#cfc2af 100%);
+  border:2px solid #b9ab99;box-shadow:0 22px 40px rgba(0,20,24,.42),
+  inset 0 2px 0 rgba(255,255,255,.7),inset 0 -12px 26px rgba(120,100,80,.22)}
+#stage .kt-key{background:linear-gradient(180deg,#fdfaf4 0%,#eee5d8 60%,#e2d8c9 100%);
+  box-shadow:0 4px 0 #b7aa98,inset 0 1px 0 rgba(255,255,255,.9)}
+#stage .kt-key.down{background:linear-gradient(180deg,#ffe2b5 0%,#f7be76 60%,#eda657 100%);
+  box-shadow:0 0 0 #b7aa98,0 0 22px rgba(255,190,120,.6),inset 0 1px 0 rgba(255,255,255,.9)}
+#stage #kt-led{background:#c9bca9}
+#stage #kt-led.on{background:#ffb45c;box-shadow:0 0 12px #ffb45c}
+
+/* ---------- 覆盖层适配 ---------- */
+#stage .so-bubble{display:none!important}
+#work-keyboard-tip{display:none}
+</style></head>
+<body>
+<main id="stage" data-layout="work-portrait" aria-label="大肥鱼打工舞台">
+  <div id="work-bg"></div>
+  <div id="work-particles"></div>
+
+  <div id="model-surface"><div id="landlord"><canvas id="live2d" class="live2d" width="1800" height="2080" aria-label="AI Live2D 角色"></canvas></div></div>
+
+  <div class="work-shadow"></div>
+  <div class="work-desk"></div>
+  <div class="work-monitor"><pre id="work-code"></pre></div>
+  <div class="work-timer" id="work-timer"><b id="work-seconds">23</b><span>秒后交货</span></div>
+  <div class="work-mug"><i>🐟</i></div>
+  <div class="work-mood" id="work-mood"><i></i><span id="work-mood-text">心情 · 专心赶工</span></div>
+
+  <div class="work-hud">
+    <section class="w-salary">
+      <div class="w-salary-top">
+        <div class="w-shift">第 <b id="shift-no">6</b> 班 · 工资 <span class="w-pct" id="salary-pct">83%</span></div>
+        <div class="w-money"><b id="salary-now">5,000</b>/ <span id="salary-max">6,000</span><span class="unit">游戏工资 元</span></div>
+      </div>
+      <div class="w-bar"><i id="salary-bar"></i></div>
+    </section>
+
+    <section class="w-pills">
+      <div class="w-pill green"><i></i>专心工作中</div>
+      <div class="w-pill purple"><i></i>老板暂未出现</div>
+    </section>
+
+    <div class="w-mults"><span>✋ 手感 ×1.00</span><span>👍 点赞最高 ×1.5</span></div>
+
+    <section class="w-rules">
+      <div class="w-rule-line"><b>玩法</b><span class="w-star">★</span> 免扣卡可以抵挡一次工资扣除</div>
+      <div class="w-stats">
+        <div><b id="stat-focus">77</b><span>专注分钟</span></div>
+        <div><b id="stat-baimang">39</b><span>本轮白干</span></div>
+        <div><b id="stat-deduct">52</b><span>被扣次数</span></div>
+        <div><b id="stat-deliver">120</b><span>成功交付</span></div>
+      </div>
+    </section>
+
+    <div class="w-log-label">大肥鱼 <i>|</i> 今日打工中</div>
+  </div>
+
+  <div class="w-log"><div id="work-log-line">提交成功！又离下班近了一点。</div></div>
+
+  <div class="work-actions">
+    <button class="w-act" data-log="白干一轮：工资没涨，工时倒是涨了。"><span class="ico">💗</span><span>白干一轮</span></button>
+    <button class="w-act" data-log="吨吨吨，续命成功，继续敲。"><span class="ico">🥤</span><span>小饮料</span></button>
+    <button class="w-act" data-log="使用免扣卡，这次不扣工资！"><span class="ico">🎫</span><span>免扣工资卡</span></button>
+    <button class="w-act" data-log="摸鱼一分钟，老板的八只手正在靠近…"><span class="ico">🐟</span><span>摸鱼一分钟</span></button>
+    <button class="w-act" data-log="大小鲸来顶班了，我先喘口气。"><span class="ico">🍬</span><span>换人大小鲸</span></button>
+    <button class="w-act" data-log="鲨总来了，全体起立！"><span class="ico">🕶️</span><span>鲨总来干活</span></button>
+    <div class="w-foot">大肥鱼 · 海里打工第 6 班</div>
+  </div>
+</main>
+
+<script src="./js/jquery.min.js"></script>
+<script src="./js/songroom-lipsync.js?v=20261028-lip1"></script>
+<script>
+const stage=document.getElementById('stage');
+function fitStage(){stage.style.transform=`scale(${Math.min(innerWidth/1080,innerHeight/1920)})`;}
+addEventListener('resize',fitStage);fitStage();
+</script>
+<script src="./js/stage-captions.js?v=caption1"></script>
+<script>window.__songroomFaceAnchor={x:0.5,y:0.19,size:0.196};</script>
+<script src="./js/stage-overlay.js?v=overlay8"></script>
+<script>window.__keyboardAlwaysTyping=true;</script>
+<script src="./js/keyboard-typing.js?v=20261103-kb4"></script>
+<script src="./js/work-stage.js?v=work1"></script>
+<script src="./js/stage-hotswap.js?v=20261103-swap1"></script>
+</body></html>

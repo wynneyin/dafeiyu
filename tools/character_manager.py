@@ -23,6 +23,7 @@ from urllib.parse import quote
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / "config.json"
 MODEL_ROOT = ROOT / "Live2D" / "live2d-model"
+FACES_ROOT = ROOT / "Live2D" / "faces"
 MODEL_JS = ROOT / "Live2D" / "js" / "model_name.js"
 AVATAR_JSON = ROOT / "Live2D" / "avatar.json"
 PROFILES = ROOT / "data" / "characters.json"
@@ -56,6 +57,9 @@ VOICES = [
     ("zh-TW-HsiaoYuNeural", "曉雨 · 女声 · 台湾腔"),
     ("zh-HK-HiuMaanNeural", "曉曼 · 女声 · 粤语"),
 ]
+
+# 舞台动作：与 stage-overlay.js 的 GESTURES 对应；模型没有 motions，只能做头/身/眼眉
+GESTURES = ["nod", "shake", "tilt", "look", "bounce", "recoil", "sway", "shiver"]
 
 _lock = threading.Lock()
 
@@ -187,6 +191,80 @@ def reload_main():
         return False, str(exc)
 
 
+def model_expressions(cfg):
+    """当前皮套的 EXP 表情名，舞台页按名字应用。"""
+    name = (cfg.get("live2d") or {}).get("name", "")
+    path = MODEL_ROOT / name
+    if not name or not path.is_dir():
+        return []
+    model3 = next(path.glob("*.model3.json"), None)
+    if model3 is None:
+        return []
+    try:
+        data = json.loads(model3.read_text(encoding="utf-8"))
+        items = (data.get("FileReferences") or {}).get("Expressions") or []
+        return [item.get("Name") for item in items if item.get("Name")]
+    except Exception:
+        return []
+
+
+def face_list():
+    """贴脸图：Live2D/faces/*.png，文件名就是配置里 face 的取值。"""
+    if not FACES_ROOT.is_dir():
+        return []
+    return sorted(p.stem for p in FACES_ROOT.glob("*.png") if not p.stem.startswith("_"))
+
+
+def stage_mappings(cfg):
+    """给页面展示的礼物/关键词映射，避免用户去翻 config.json。"""
+    effects = cfg.get("effects") or {}
+    keywords = []
+    if isinstance(effects, dict):
+        for name, item in effects.items():
+            if not isinstance(item, dict) or not item.get("enable"):
+                continue
+            keywords.append({
+                "name": name,
+                "keywords": item.get("keywords") or [],
+                "gesture": item.get("gesture", ""),
+                "expression": item.get("expression", ""),
+                "face": item.get("face", ""),
+            })
+    stage = cfg.get("stage_actions") or {}
+    gifts = []
+    if isinstance(stage.get("gifts"), dict):
+        for gift, rule in stage["gifts"].items():
+            if isinstance(rule, dict):
+                gifts.append({"gift": gift, **{k: rule.get(k, "") for k in ("gesture", "expression", "duration", "face")}})
+    fallback = stage.get("gift_fallback") if isinstance(stage.get("gift_fallback"), dict) else None
+    return {"keywords": keywords, "gifts": gifts, "fallback": fallback, "enable": bool(stage.get("enable"))}
+
+
+def trigger_stage(payload):
+    """手动触发一次舞台动作/表情/贴脸，走字幕服务的 /effect。"""
+    from urllib.parse import urlencode
+
+    cfg = read_config()
+    base = ((cfg.get("web_captions_printer") or {}).get("api_ip_port") or "").rstrip("/")
+    if not base:
+        raise ValueError("config.json 里没有配置 web_captions_printer.api_ip_port")
+    params = {"name": "manager-preview"}
+    for key in ("gesture", "expression", "face"):
+        value = str(payload.get(key) or "").strip()
+        if value:
+            params[key] = value[:64]
+    try:
+        duration = float(payload.get("duration") or 0)
+    except (TypeError, ValueError):
+        duration = 0
+    if duration:
+        params["duration"] = max(0.5, min(15.0, duration))
+    if params.get("face"):
+        params["face_duration"] = max(0.5, min(60.0, duration or 6.0))
+    with urllib.request.urlopen(base + "/effect?" + urlencode(params), timeout=2) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
 def write_model_files(name, bump=True):
     target = MODEL_ROOT / name
     if not target.is_dir():
@@ -310,6 +388,10 @@ class Handler(BaseHTTPRequestHandler):
                     "main_online": main_online(),
                     "chat_type": cfg.get("chat_type"),
                     "tts_type": cfg.get("audio_synthesis_type"),
+                    "gestures": GESTURES,
+                    "expressions": model_expressions(cfg),
+                    "faces": face_list(),
+                    "stage_mappings": stage_mappings(cfg),
                 }
             )
             self._json({"ok": True, "state": state})
@@ -338,6 +420,11 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header("Content-Length", str(len(audio)))
                 self.end_headers()
                 self.wfile.write(audio)
+                return
+
+            if path == "/api/action":
+                result = trigger_stage(payload)
+                self._json({"ok": True, "stage": result})
                 return
 
             if path == "/api/profile/save":

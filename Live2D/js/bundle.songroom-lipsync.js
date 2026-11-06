@@ -1908,6 +1908,8 @@
                         window.__songroomMouthApplied = {index: this._songroomMouthIndex, requested: level, actual: this._model.getParameterValueByIndex(this._songroomMouthIndex)};
                     }
                 }).call(this), (function () {
+                    // 调试钩子：页面控制台可以查参数、排查表情
+                    window.__songroomModel = this;
                     // 舞台叠加层的姿态钩子：模型没有 motions，思考状态用歪头/眼球上翻/抬眉体现
                     var p = window.__songroomPose;
                     if (p) {
@@ -1927,10 +1929,12 @@
                         }
                     }
                     // 一次性表情：前端改了名字才应用一次，不每帧重放
+                    // 空字符串表示清除表情（礼物/关键词动作结束后回到常态）
                     var want = window.__songroomExpression;
-                    if (want && want !== this._songroomExpressionApplied) {
+                    if (want !== void 0 && want !== this._songroomExpressionApplied) {
                         this._songroomExpressionApplied = want;
-                        this.setExpression(want);
+                        if (want) this.setExpression(want);
+                        else if (this._expressionManager) this._expressionManager.stopAllMotions();
                     }
                 }).call(this), this._model.update()
             }

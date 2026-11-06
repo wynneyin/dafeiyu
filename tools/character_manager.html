@@ -62,6 +62,8 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .adv summary{cursor:pointer;color:var(--muted);font-size:13px}
 .adv[open] summary{margin-bottom:10px}
 audio{height:34px}
+button.mini{padding:5px 12px;font-size:13px;border-radius:999px}
+.tag{display:inline-block;padding:2px 9px;border-radius:999px;background:#0b2138;border:1px solid var(--line);font-size:12px;color:var(--muted);margin:0 6px 6px 0}
 </style>
 </head>
 <body>
@@ -72,6 +74,7 @@ audio{height:34px}
   <span class="chip"><i class="dot" id="dot-main"></i>主程序 <span id="main-text">检测中</span></span>
   <span class="chip">LLM：<span id="llm-text">-</span></span>
   <span class="chip">TTS：<span id="tts-text">-</span></span>
+  <a class="chip" href="http://127.0.0.1:12345/Live2D/stage-work.html" target="_blank" rel="noopener">打工舞台预览 ↗</a>
 </div>
 
 <div class="card">
@@ -98,6 +101,32 @@ audio{height:34px}
   <h2>人设提示词 <small>写进 config.json 的 claude.preset</small></h2>
   <textarea id="preset" spellcheck="false"></textarea>
   <div class="hint"><span id="preset-count">0</span> 字。角色档案会把它一起存下来，方便以后做别的角色。</div>
+</div>
+
+<div class="card">
+  <h2>动作与表情 <small>点一下直接让舞台播一次</small></h2>
+  <div class="row" style="margin-bottom:10px">
+    <label style="min-width:46px">动作</label>
+    <div class="row" id="gesture-btns" style="gap:8px"></div>
+  </div>
+  <div class="row" style="margin-bottom:10px">
+    <label style="min-width:46px">表情</label>
+    <div class="row" id="expression-btns" style="gap:8px"></div>
+  </div>
+  <div class="row" style="margin-bottom:10px">
+    <label style="min-width:46px">贴脸</label>
+    <div class="row" id="face-btns" style="gap:8px"></div>
+  </div>
+  <div class="row">
+    <label for="action-duration">表情持续</label>
+    <input type="number" id="action-duration" min="0.5" max="15" step="0.5" value="4" style="width:90px">
+    <span class="hint" style="margin:0">秒</span>
+  </div>
+  <details class="adv" style="margin-top:12px">
+    <summary>当前触发规则</summary>
+    <div id="stage-mappings" class="hint"></div>
+  </details>
+  <div class="hint">礼物映射在 config.json 的 stage_actions，关键词映射在 effects；改完点“保存并应用”热重载。</div>
 </div>
 
 <div class="card adv-wrap">
@@ -205,8 +234,84 @@ function renderVoices() {
   sel.value = state.voice;
 }
 
-function renderProfiles() {
-  const box = $('profiles');
+async function runAction(payload) {
+  try {
+    await api('/api/action', payload);
+    const label = [payload.gesture && ('动作 ' + payload.gesture), payload.expression && ('表情 ' + payload.expression),
+      payload.face && ('贴脸 ' + payload.face)]
+      .filter(Boolean).join(' + ');
+    showMessages(['已触发：' + label + '（看舞台/OBS 画面）'], ['ok']);
+  } catch (e) {
+    showMessages(['触发失败：' + e.message], ['err']);
+  }
+}
+
+function renderActions() {
+  const gbox = $('gesture-btns');
+  gbox.innerHTML = '';
+  (state.gestures || []).forEach((name) => {
+    const b = document.createElement('button');
+    b.className = 'mini'; b.textContent = name;
+    b.onclick = () => runAction({gesture: name});
+    gbox.appendChild(b);
+  });
+
+  const ebox = $('expression-btns');
+  ebox.innerHTML = '';
+  const exprs = state.expressions || [];
+  if (!exprs.length) {
+    const span = document.createElement('span');
+    span.className = 'hint'; span.style.margin = '0';
+    span.textContent = '当前皮套没有 EXP 表情';
+    ebox.appendChild(span);
+  }
+  exprs.forEach((name) => {
+    const b = document.createElement('button');
+    b.className = 'mini'; b.textContent = name;
+    b.onclick = () => runAction({expression: name, duration: Number($('action-duration').value) || 4});
+    ebox.appendChild(b);
+  });
+
+  const fbox = $('face-btns');
+  fbox.innerHTML = '';
+  const faces = state.faces || [];
+  if (!faces.length) {
+    const span = document.createElement('span');
+    span.className = 'hint'; span.style.margin = '0';
+    span.textContent = 'Live2D/faces 下还没有贴脸图（放 <名字>.png 即可）';
+    fbox.appendChild(span);
+  }
+  faces.forEach((name) => {
+    const b = document.createElement('button');
+    b.className = 'mini'; b.textContent = name;
+    b.onclick = () => runAction({face: name, duration: Number($('action-duration').value) || 4});
+    fbox.appendChild(b);
+  });
+
+  const box = $('stage-mappings');
+  box.innerHTML = '';
+  const maps = state.stage_mappings || {};
+  const lines = [];
+  if ((maps.gifts || []).length) {
+    lines.push('礼物：' + maps.gifts.map((g) =>
+      `${g.gift} → ${g.gesture || '-'}${g.expression ? ' / ' + g.expression : ''}${g.face ? ' / 贴脸 ' + g.face : ''}`).join('；'));
+  }
+  if (maps.fallback) {
+    const f = maps.fallback;
+    lines.push(`其他礼物（总价 ≥ ${f.min_price ?? 0}） → ${f.gesture || '-'}${f.expression ? ' / ' + f.expression : ''}`);
+  }
+  (maps.keywords || []).forEach((k) => {
+    lines.push(`关键词「${(k.keywords || []).join('、')}」 → ${k.gesture || '-'}${k.expression ? ' / ' + k.expression : ''}${k.face ? ' / 贴脸 ' + k.face : ''}`);
+  });
+  if (!lines.length) lines.push('还没有配置动作映射。');
+  lines.forEach((text) => {
+    const div = document.createElement('div');
+    div.textContent = text;
+    box.appendChild(div);
+  });
+}
+
+function renderProfiles() {  const box = $('profiles');
   box.innerHTML = '';
   $('profiles-empty').style.display = state.profiles.length ? 'none' : 'block';
   state.profiles.forEach((p) => {
@@ -258,6 +363,7 @@ async function load() {
     $('volume-out').textContent = pct(state.volume);
     $('preset').value = state.preset || '';
     $('preset-count').textContent = ($('preset').value || '').length;
+    renderActions();
     renderProfiles();
   } catch (e) {
     showMessages(['读取配置失败：' + e.message], ['err']);

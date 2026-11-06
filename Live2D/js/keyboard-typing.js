@@ -173,17 +173,19 @@
   function loop(now) {
     const talk = speaking();
     const think = thinking();
+    // 打工舞台要求「一直在打字」：页面把 window.__keyboardAlwaysTyping 设为 true
+    const always = !!window.__keyboardAlwaysTyping;
 
     // 不说话时也要时不时来一小段敲击，维持「一直在打字」的感觉
-    if (!talk && !think && now > nextBurstAt && now > burstEnd) {
+    if (!always && !talk && !think && now > nextBurstAt && now > burstEnd) {
       burstEnd = now + 450 + Math.random() * 1000;
       nextBurstAt = burstEnd + 2200 + Math.random() * 4200;
     }
 
-    const active = talk || think || now < burstEnd;
+    const active = always || talk || think || now < burstEnd;
     if (active && now >= nextClickAt) {
       press();
-      const cps = talk ? 11 + Math.random() * 6 : (think ? 7 : 9);
+      const cps = talk ? 11 + Math.random() * 6 : (think || always ? 7.5 : 9);
       nextClickAt = now + 1000 / cps;
     } else if (!active) {
       nextClickAt = now + 40;

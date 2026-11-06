@@ -60,17 +60,22 @@ D:\dafeiyu-ai-vtuber\
 │  ├─ songroom_lipsync.py       播放音量采集，供口型使用
 │  ├─ songroom_overlay.py       直播状态采集（只读日志）
 │  ├─ danmaku_smoke_test.py     弹幕全链路冒烟测试
+│  ├─ patch_expression_watermark.py  给模型 EXP 补水印参数（换模型后执行）
+│  ├─ make_face_cutout.py       把照片裁成贴脸图（透明 PNG）
 │  ├─ claude_smoke_test.py      Claude/中转接入冒烟测试
 │  └─ DouyinBarrageGrab\        弹幕监听程序及配置
 ├─ Live2D\
 │  ├─ stage-portrait.html       竖屏舞台（抖音用）
 │  ├─ stage-landscape.html      横屏舞台
+│  ├─ stage-work.html           打工舞台（工位 HUD + 持续打字）
 │  ├─ live2d-model\             Live2D 模型目录
+│  ├─ faces\                    贴脸图（透明 PNG，文件名即配置里的 face 值）
 │  ├─ avatar.json               皮套热切换令牌（运行时生成）
 │  └─ js\
 │     ├─ model_name.js          当前模型名（运行时生成）
 │     ├─ stage-captions.js      字幕层
 │     ├─ stage-overlay.js       思考气泡、特效、姿态
+│     ├─ work-stage.js          打工舞台：粒子、代码滚动、倒计时、快捷栏
 │     ├─ keyboard-typing.js     键盘层与敲击音效
 │     ├─ stage-hotswap.js       皮套热切换轮询
 │     └─ songroom-lipsync.js    口型驱动
@@ -181,6 +186,79 @@ Edge TTS 依赖 `wss://speech.platform.bing.com`。网络波动时可能返回 5
 
 修改入口：角色管理页“人设提示词”，或 `config.json` 的 `claude.preset`。
 
+### 6.5 动作与表情触发
+
+礼物或弹幕关键词可以触发角色动作与表情。规则都在 `config.json`，改完在角色管理页点“保存并应用”（热重载）或重启主程序。
+
+关键词（`effects` 段）：
+
+| 字段 | 说明 |
+| --- | --- |
+| `enable` | 是否启用 |
+| `keywords` | 命中任意一个即触发 |
+| `gesture` | 动作名：`nod` 点头、`shake` 摇头、`tilt` 歪头、`look` 左右看、`bounce` 弹跳、`recoil` 后仰、`sway` 摇摆、`shiver` 发抖 |
+| `expression` | 模型 EXP 表情名，如 `04 脸红`；留空只做动作 |
+| `duration` | 表情持续秒数，默认 3.5，范围 0.5–15 |
+| `face` | 贴脸图名，对应 `Live2D/faces/<名字>.png`；留空不贴脸 |
+| `face_duration` | 贴脸停留秒数，默认跟随 `duration`，范围 0.5–60 |
+
+示例：
+
+```json
+"shy": {
+  "enable": true,
+  "keywords": ["脸红", "害羞"],
+  "gesture": "tilt",
+  "expression": "04 脸红",
+  "duration": 4.0
+}
+```
+
+礼物（`stage_actions` 段）：
+
+- `gifts`：礼物名 → 动作/表情，礼物名与直播间显示一致即可，连击后缀 `xN` 会被忽略；
+- `gift_fallback`：未命中名单时按总价兜底，`min_price` 单位是抖币；
+- `cooldown_seconds`：同一礼物名的冷却时间，防止连击把动作刷成抽帧，默认 2 秒。
+
+触发不依赖答谢语音：即使 `thanks.gift_enable` 关闭或价格低于答谢门槛，动作照常播放。关键词触发在弹幕进入主流程后执行，仍受弹幕过滤与去重影响。
+
+动作限制：大肥鱼模型没有 motions，动作只能驱动头部、身体角度和眼眉。表情使用模型自带的 EXP；围裙上有作者水印，平时靠常驻表情“13 水印消除”遮挡，因此该模型的 EXP 文件里给每个表情补了 `Paramcol_3=1`（Add），切换表情时水印仍然隐藏。模型目录在 `.gitignore` 中，这些 EXP 改动只存在本机；模型被替换或换到新机器后，执行：
+
+```powershell
+D:\dafeiyu-ai-vtuber\.venv\Scripts\python.exe tools\patch_expression_watermark.py
+```
+
+脚本幂等，只改 EXP 下的 `.exp3.json`。
+
+测试入口：角色管理页“动作与表情”可逐项点播；舞台 URL 加 `?gesture=sway&expr=04%20脸红&exprms=6000` 也能在加载后直接预置一次。
+
+### 6.6 贴脸图
+
+“贴脸”是把一张透明 PNG 盖在角色脸上，适合做“牢大贴脸”这类梗。图片放在 `Live2D/faces/`，文件名（不含扩展名）就是配置里的 `face` 值，例如 `Live2D/faces/牢大.png` 对应 `"face": "牢大"`。
+
+最小配置（关键词触发）：
+
+```json
+"laoda": {
+  "enable": true,
+  "keywords": ["牢大", "科比", "kobe", "曼巴"],
+  "face": "牢大",
+  "face_duration": 6.0,
+  "duration": 6.0
+}
+```
+
+礼物也可以贴脸，在 `stage_actions.gifts.<礼物名>` 里加 `face` 与 `face_duration` 即可，和 `gesture`/`expression` 互不影响。
+
+制作图片：
+
+- 用带透明通道的 PNG，头部居中，多余的脖子、球衣、背景尽量裁掉；
+- 蓝幕背景的照片可以直接用脚本裁：`D:\dafeiyu-ai-vtuber\.venv\Scripts\python.exe tools\make_face_cutout.py 照片.webp --name 牢大`，默认只取头部、抠掉蓝底；背景不是蓝色时加 `--key none` 自己先裁好；
+- 舞台按“模型框”的固定比例定位：中心在模型框宽 50%、高 27% 处，宽度占模型框 26%。换皮套一般不用改，头部偏上/偏下时调 `stage-overlay.js` 里的 `FACE_ANCHOR`（三个值依次是 `x`、`y`、`size`）；
+- 图片会在停留时间结束后淡出；连续触发会重新弹一次。
+
+测试入口：角色管理页“动作与表情 → 贴脸”会列出 `Live2D/faces` 下的所有 PNG；舞台 URL 加 `?face=牢大&facems=6000` 也能直接预览。
+
 ---
 
 ## 7. 角色管理页（8090）
@@ -194,6 +272,7 @@ Edge TTS 依赖 `wss://speech.platform.bing.com`。网络波动时可能返回 5
 | 人设 | 编辑 `claude.preset`，带字数统计 |
 | LLM | 修改 `claude.model`，模型列表来自 3425 中转 |
 | 角色档案 | 将皮套、音色、人设、LLM 存为一套，支持应用与删除 |
+| 动作与表情 | 列出当前皮套的 EXP 表情、内置动作和 `Live2D/faces` 贴脸图，点一下直接触发；显示礼物/关键词映射（只读） |
 
 “保存并应用”执行顺序：写 `config.json`（原子替换）→ 写模型文件 → 调用主程序 `POST /admin/reload`。主程序在线时新配置立即生效；离线时仅落盘，下次启动生效。
 
@@ -219,6 +298,17 @@ http://127.0.0.1:12345/Live2D/stage-portrait.html
 http://127.0.0.1:12345/Live2D/stage-landscape.html
 ```
 
+打工舞台（角色放大到工位后面、持续敲键盘，带工资/统计 HUD 和底部快捷栏）：
+
+```text
+http://127.0.0.1:12345/Live2D/stage-work.html
+```
+
+- 角色固定用大肥鱼（不看 `model_name.js` 当前皮套），想调试别的皮套可加 `?model=Hiyori`；
+- 纯角色模式：加 `?hud=0` 隐藏工资面板、统计、日志、心情气泡和底部快捷栏，只保留角色、桌子、显示器和键盘；
+- HUD 里的班次、工资、统计是演示数据，在 `stage-work.html` 里直接改文字即可；倒计时、代码滚动、打字音效是动态的；
+- 底部六个按钮在浏览器里可点击（OBS 需要用“交互”窗口），点击会在日志显示对应台词并敲一小段键盘。
+
 注意路径中包含 `/Live2D/`。浏览器源尺寸建议与舞台一致（竖屏 1080×1920），页面会按窗口等比缩放。
 
 页面组成：
@@ -229,6 +319,8 @@ http://127.0.0.1:12345/Live2D/stage-landscape.html
 - 口型：读取 `out/songroom/mouth.json` 的真实播放音量；
 - 键盘层：`keyboard-typing.js`，随说话/思考/空闲改变敲击频率。
 
+打工舞台额外包含工资/统计 HUD、显示器代码滚动、交货倒计时、心情气泡和底部快捷栏；AI 字幕直接显示在“今日打工中”日志面板里，不再占用底部字幕条。该页面的键盘位置和颜色用页面 CSS 固定，`kbsize`/`kbbottom` 不生效。
+
 键盘层可调参数（URL 查询串）：
 
 | 参数 | 默认（竖屏） | 说明 |
@@ -237,6 +329,11 @@ http://127.0.0.1:12345/Live2D/stage-landscape.html
 | `keysound=0` | - | 静音 |
 | `kbsize` | `0.64` | 键盘缩放 |
 | `kbbottom` | `10` | 距底部像素 |
+| `gesture` | - | 加载后播放一次动作，如 `sway` |
+| `expr` | - | 加载后应用一次表情，如 `04%20脸红` |
+| `exprms` | `6000` | 预置表情持续毫秒 |
+| `face` | - | 加载后贴一次脸，如 `牢大` |
+| `facems` | `6000` | 预置贴脸持续毫秒 |
 
 ### 8.2 音频
 
@@ -339,6 +436,7 @@ D:\dafeiyu-ai-vtuber\.venv\Scripts\python.exe tools\claude_smoke_test.py
 - 本地中转不可用时没有自动降级或备用模型。
 - 热重载会清空当前对话上下文。
 - 切换皮套会触发舞台页面重载，画面约有 2 秒中断。
+- 模型没有 motions，动作只能是头部/身体/眼眉级别；表情持续结束后自动回到“13 水印消除”。
 - Edge TTS 依赖外部服务，网络异常时合成失败，当前仅记录日志，不自动重试。
 - 字幕、口型、状态采集为独立进程，未纳入主程序的统一生命周期管理。
 - 角色管理页与 WebUI 均可修改 `config.json`，同时操作时以最后保存的为准。
@@ -355,5 +453,10 @@ D:\dafeiyu-ai-vtuber\.venv\Scripts\python.exe tools\claude_smoke_test.py
 - 新增角色管理页（8090）：皮套、音色、人设、LLM、角色档案。
 - 新增舞台热切换（`avatar.json` + `stage-hotswap.js`）与主程序配置热重载（`POST /admin/reload`）。
 - 新增键盘层（视觉与合成敲击音效）。
+- 新增礼物/关键词触发的动作与表情：`effects` 增加 gesture/expression/duration，新增 `stage_actions` 礼物映射，舞台支持表情切换与自动复位。
+- 大肥鱼 EXP 表情补充 `Paramcol_3`，切换表情时保持水印隐藏；新增 `tools/patch_expression_watermark.py`，`.exp3.json` 禁用缓存。
+- 角色管理页新增“动作与表情”测试面板。
+- 新增贴脸图功能：`Live2D/faces/*.png` 按模型框比例盖在角色脸上，`effects`/`stage_actions` 支持 `face`/`face_duration`，管理页可一键预览；贴脸图禁用缓存。
+- 新增打工舞台 `stage-work.html`：大肥鱼放大到工位后面持续敲键盘，带工资/统计 HUD、代码滚动、交货倒计时、心情气泡和底部快捷栏；支持 `?hud=0` 纯角色模式和 `?model=` 调试皮套。
 - 新增弹幕全链路冒烟测试。
 - Live2D 静态服务对入口 HTML、`model_name.js`、`avatar.json` 禁用缓存。

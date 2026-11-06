@@ -48,6 +48,12 @@
     22%{opacity:1;transform:translate(-50%,-50%) scale(1.12) rotate(4deg)}
     70%{opacity:1;transform:translate(-50%,-50%) scale(1) rotate(0)}
     100%{opacity:0;transform:translate(-50%,-50%) scale(1.25)}}
+  .so-face{position:absolute;z-index:8;pointer-events:none;opacity:0;
+    transform:translate(-50%,-50%) scale(.82);transform-origin:center center;
+    transition:opacity .16s ease,transform .16s ease;
+    filter:drop-shadow(0 10px 22px rgba(4,14,28,.45));
+    -webkit-user-drag:none;user-select:none}
+  .so-face.on{opacity:1;transform:translate(-50%,-50%) scale(1)}
   `;
   document.head.appendChild(style);
 
@@ -62,19 +68,84 @@
   layer.appendChild(bubble);
   const bubbleText = bubble.querySelector('.so-text');
 
-  // 气泡跟着角色头部走：用模型框的实测位置换算成 stage 内坐标，
-  // 这样横屏/竖屏两套布局都不用各写一套坐标。
-  function place() {
-    if (!model) return;
+  // 贴脸图：把 Live2D/faces/<名字>.png 盖在角色脸上，用来玩「牢大贴脸」这类梗。
+  // 位置按模型框的比例算，换横屏/竖屏布局或者换舞台尺寸都不用改坐标。
+  // 特殊舞台（比如把模型放大裁到桌面后面）可以在页面里预设 window.__songroomFaceAnchor 覆盖。
+  const FACE_ANCHOR = Object.assign(
+    { x: 0.5, y: 0.27, size: 0.26 },   // 相对于模型框：中心点 + 宽度占比
+    (window.__songroomFaceAnchor && typeof window.__songroomFaceAnchor === 'object')
+      ? window.__songroomFaceAnchor : {}
+  );
+  const faceImg = document.createElement('img');
+  faceImg.className = 'so-face';
+  faceImg.alt = '';
+  faceImg.draggable = false;
+  layer.appendChild(faceImg);
+  let faceAnchor = { ...FACE_ANCHOR };
+  let faceTimer = 0;
+
+  // 模型框在 stage 坐标里的位置（stage 可能被整体缩放，所以用 k 还原）
+  function modelBox() {
+    if (!model) return null;
     const s = stage.getBoundingClientRect();
     const r = model.getBoundingClientRect();
     const k = stage.offsetWidth ? s.width / stage.offsetWidth : 1;
-    const left = (r.left - s.left) / k;
-    const top = (r.top - s.top) / k;
-    const w = r.width / k;
-    const h = r.height / k;
-    bubble.style.left = Math.round(left + w * 0.63) + 'px';
-    bubble.style.top = Math.round(top + h * 0.02) + 'px';
+    return {
+      left: (r.left - s.left) / k,
+      top: (r.top - s.top) / k,
+      w: r.width / k,
+      h: r.height / k,
+    };
+  }
+
+  function placeFace() {
+    const box = modelBox();
+    if (!box) return;
+    faceImg.style.width = Math.round(box.w * faceAnchor.size) + 'px';
+    faceImg.style.left = Math.round(box.left + box.w * faceAnchor.x) + 'px';
+    faceImg.style.top = Math.round(box.top + box.h * faceAnchor.y) + 'px';
+    faceImg.style.height = 'auto';
+  }
+
+  function hideFace() {
+    clearTimeout(faceTimer);
+    faceImg.classList.remove('on');
+    setTimeout(() => { if (!faceImg.classList.contains('on')) faceImg.removeAttribute('src'); }, 300);
+  }
+
+  function showFace(name, ms, meta) {
+    name = String(name || '').trim();
+    if (!name) { hideFace(); return; }
+    meta = meta || {};
+    faceAnchor = {
+      x: Number(meta.face_x) || FACE_ANCHOR.x,
+      y: Number(meta.face_y) || FACE_ANCHOR.y,
+      size: Number(meta.face_size) || FACE_ANCHOR.size,
+    };
+    clearTimeout(faceTimer);
+    faceImg.src = './faces/' + encodeURIComponent(name) + '.png';
+    placeFace();
+    // 先移除再添加，连续触发时重新播一下弹出动画
+    faceImg.classList.remove('on');
+    void faceImg.offsetWidth;
+    faceImg.classList.add('on');
+    const hold = Math.max(800, Number(ms) || 5000);
+    faceTimer = setTimeout(hideFace, hold);
+  }
+
+  faceImg.addEventListener('error', () => {
+    console.warn('[贴脸] 图片加载失败：', faceImg.src);
+    hideFace();
+  });
+
+  // 气泡跟着角色头部走：用模型框的实测位置换算成 stage 内坐标，
+  // 这样横屏/竖屏两套布局都不用各写一套坐标。
+  function place() {
+    const box = modelBox();
+    if (!box) return;
+    bubble.style.left = Math.round(box.left + box.w * 0.63) + 'px';
+    bubble.style.top = Math.round(box.top + box.h * 0.02) + 'px';
+    placeFace();
   }
 
 
@@ -92,7 +163,30 @@
     recoil: { dur: 0.8, curves: { bodyZ:  [[0, 0], [0.3, 9], [1, 0]],
                                   angleY: [[0, 0], [0.3, -6], [1, 0]],
                                   browY:  [[0, 0], [0.3, 0.9], [1, 0]] } },
+    sway:   { dur: 2.8, curves: { angleZ: [[0, 0], [0.22, 10], [0.5, -8], [0.78, 5], [1, 0]],
+                                  bodyZ:  [[0, 0], [0.22, -3], [0.5, 3], [0.78, -2], [1, 0]] } },
+    shiver: { dur: 0.7, curves: { bodyZ:  [[0, 0], [0.15, 4], [0.3, -4], [0.45, 3.5], [0.6, -3.5], [0.75, 2], [1, 0]],
+                                  browY:  [[0, 0], [0.3, 0.6], [1, 0]] } },
   };
+
+  // 表情：走模型自带的表情切换（expressionManager）。
+  // 大肥鱼围裙上有作者水印，平时靠常驻表情「13 水印消除」遮住；普通表情会把它顶掉。
+  // 模型 EXP 文件里已经给每个表情补了 Paramcol_3（Value 1, Add），所以切表情时水印仍然隐藏。
+  // 结束后回到「13 水印消除」；别的皮套没有这个表情，用空字符串清除即可。
+  function baseExpression() {
+    return window.model_name === '大肥鱼' ? '13 水印消除' : '';
+  }
+
+  let expressionTimer = 0;
+
+  function applyExpression(name, ms) {
+    if (!name) return;
+    clearTimeout(expressionTimer);
+    window.__songroomExpression = name;
+    expressionTimer = setTimeout(() => {
+      window.__songroomExpression = baseExpression();
+    }, Math.max(800, Number(ms) || 3500));
+  }
 
   let activeGesture = null;
 
@@ -171,12 +265,29 @@
     requestAnimationFrame(poseLoop);
   }
 
-  function playEffect(name) {
+  function playEffect(name, meta) {
+    meta = meta || {};
     if (name && name.indexOf('gesture:') === 0) {
       // 调试用：/effect?name=gesture:nod 可以单独触发某个手势
       playGesture(name.slice(8));
       return;
     }
+    if (name && name.indexOf('face:') === 0) {
+      // 调试用：/effect?name=face:牢大 直接贴脸
+      showFace(name.slice(5), (Number(meta.face_duration) || 6) * 1000, meta);
+      return;
+    }
+
+    // 动作与表情由主程序按 config.json 下发，特效名本身不携带规则
+    const gesture = meta.gesture || (name === 'clap' ? 'bounce' : '');
+    if (gesture) playGesture(gesture);
+    if (meta.expression) {
+      applyExpression(meta.expression, (Number(meta.duration) || 3.5) * 1000);
+    }
+    if (meta.face) {
+      showFace(meta.face, (Number(meta.face_duration) || Number(meta.duration) || 5) * 1000, meta);
+    }
+
     if (name === 'clap') {
       // 只做参数手势，不切表情：模型靠「13 水印消除」表情遮住围裙上的
       // 作者水印和署名，一旦切换到别的表情就会把那段字露到直播间里。
@@ -220,11 +331,19 @@
         lastEffectSeq = seq;                      // 初次加载不补播历史事件
       } else if (seq > lastEffectSeq) {
         lastEffectSeq = seq;
-        if (Date.now() / 1000 - Number(data.effect_at || 0) < 12) playEffect(data.effect);
+        if (Date.now() / 1000 - Number(data.effect_at || 0) < 12) {
+          playEffect(data.effect, {
+            gesture: data.effect_gesture,
+            expression: data.effect_expression,
+            duration: data.effect_duration,
+            face: data.effect_face,
+            face_duration: data.effect_face_duration,
+          });
+        }
       }
       // 空闲时随机来个小动作，别老一个姿势（20~45 秒一次）
       if (!window.__soNextGestureAt) window.__soNextGestureAt = Date.now() + 20000 + Math.random() * 25000;
-      if (Date.now() > window.__soNextGestureAt && !thinking) {
+      if (Date.now() > window.__soNextGestureAt && !thinking && !activeGesture) {
         const pool = ['tilt', 'look', 'nod'];
         playGesture(pool[Math.floor(Math.random() * pool.length)]);
         window.__soNextGestureAt = Date.now() + 20000 + Math.random() * 25000;
@@ -243,4 +362,17 @@
   place();
   poseLoop();
   poll();
+
+  // 调试/预置用：URL 带 ?gesture=sway&expr=04%20脸红&face=牢大 时加载后直接播一次
+  try {
+    const params = new URLSearchParams(location.search);
+    const gesture = params.get('gesture');
+    const expr = params.get('expr');
+    const ms = Number(params.get('exprms')) || 6000;
+    const face = params.get('face');
+    const facems = Number(params.get('facems')) || 6000;
+    if (gesture) playGesture(gesture);
+    if (expr) applyExpression(expr, ms);
+    if (face) showFace(face, facems);
+  } catch (e) { /* 老浏览器不支持 URLSearchParams 就忽略 */ }
 })();
